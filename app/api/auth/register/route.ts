@@ -1,30 +1,46 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server';
+import { findUserByEmail, createUser, hashPassword, generateToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json()
+    const { username, email, name, password } = await request.json();
 
-    // Simulate user registration logic
-    if (name && email && password) {
-      // In a real app, you'd save the user to a database
-      const user = {
-        id: Date.now().toString(),
-        name,
-        email,
-      }
-
-      // In a real app, you'd generate a proper JWT token
-      const token = "mock_jwt_token_" + Date.now()
-
-      return NextResponse.json({
-        success: true,
-        user,
-        token,
-      })
+    if (!username || !email || !name || !password) {
+      return NextResponse.json(
+        { success: false, message: 'All fields are required' },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 })
+    const existingUser = findUserByEmail(email);
+    
+    if (existingUser) {
+      return NextResponse.json(
+        { success: false, message: 'User already exists' },
+        { status: 409 }
+      );
+    }
+
+    const hashedPassword = hashPassword(password);
+    const newUser = createUser({
+      username,
+      email,
+      name,
+      password: hashedPassword,
+    });
+
+    const token = generateToken(newUser.id);
+    const { password: _, ...userWithoutPassword } = newUser;
+
+    return NextResponse.json({
+      success: true,
+      user: userWithoutPassword,
+      token,
+    });
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Server error" }, { status: 500 })
+    return NextResponse.json(
+      { success: false, message: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

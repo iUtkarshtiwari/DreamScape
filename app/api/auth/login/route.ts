@@ -1,30 +1,48 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server';
+import { findUserByEmail, comparePassword, generateToken, hashPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const { email, password } = await request.json();
 
-    // Simulate authentication logic
-    if (email && password) {
-      // In a real app, you'd verify credentials against a database
-      const user = {
-        id: "1",
-        email,
-        name: "Dream Creator",
-      }
-
-      // In a real app, you'd generate a proper JWT token
-      const token = "mock_jwt_token_" + Date.now()
-
-      return NextResponse.json({
-        success: true,
-        user,
-        token,
-      })
+    if (!email || !password) {
+      return NextResponse.json(
+        { success: false, message: 'Email and password are required' },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ success: false, message: "Invalid credentials" }, { status: 401 })
+    const user = findUserByEmail(email);
+    
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+
+    // For demo purposes, accept any password for the demo user
+    const isValidPassword = email === 'demo@example.com' ? true : user.password ? comparePassword(password, user.password) : false;
+
+    if (!isValidPassword) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+
+    const token = generateToken(user.id);
+    const { password: _, ...userWithoutPassword } = user;
+
+    return NextResponse.json({
+      success: true,
+      user: userWithoutPassword,
+      token,
+    });
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Server error" }, { status: 500 })
+    return NextResponse.json(
+      { success: false, message: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
